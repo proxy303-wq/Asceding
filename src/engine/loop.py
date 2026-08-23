@@ -24,6 +24,7 @@ from ..market.chain import ChainService
 from ..market.instruments import InstrumentMaster, Underlying, atm_strike, dte, expiry_by_rank
 from ..strategies.breakout import BreakoutStrategy
 from ..strategies.candlestick import CandlestickStrategy
+from ..strategies.levels import LevelPrimaryStrategy
 from ..strategies.meanrev import MeanReversionStrategy
 from ..strategies.contrarian import ContrarianStrategy
 from ..telegram import TelegramCommander, TelegramNotifier
@@ -67,6 +68,7 @@ class AutoTrader:
             TrendMomentumStrategy(self.cfg, strat_cfg.get("momentum", {})),
             BreakoutStrategy(self.cfg, strat_cfg.get("breakout", {})),
             CandlestickStrategy(self.cfg, strat_cfg.get("candlestick", {})),
+            LevelPrimaryStrategy(self.cfg, strat_cfg.get("levels", {})),
             MeanReversionStrategy(self.cfg, strat_cfg.get("meanrev", {})),
             ContrarianStrategy(self.cfg, strat_cfg.get("contrarian", {})),
         ]

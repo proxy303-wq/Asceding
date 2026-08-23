@@ -33,6 +33,7 @@ REGIME_STRATEGY_MAP = {
     "momentum":    {"TREND_UP", "TREND_DOWN", "VOLATILE"},
     "breakout":    {"TREND_UP", "TREND_DOWN", "VOLATILE"},
     "candlestick": {"RANGE", "TREND_UP", "TREND_DOWN"},
+    "levels":     {"RANGE", "TREND_UP", "TREND_DOWN"},
     "meanrev":     {"RANGE"},
     "contrarian":  {"RANGE"},
 }

@@ -91,6 +91,16 @@ strategies:
     strike_offset: 1
     sl_atr_mult: 0.40
     max_hold_min: 150
+  levels:                    # LEVEL-PRIMARY: price lines decide, indicators confirm
+    enabled: true
+    look_atr: 1.2            # how close to a level counts as 'at' it
+    wick_atr: 0.1            # wick tolerance for hold/reject
+    break_atr: 0.3           # close beyond level by this x ATR = break
+    min_confirm: 45          # confirmator score required (of 100) - the rest are just confirmators
+    iv_max_percentile: 70
+    strike_offset: 1
+    entry_hm_start: 930
+    entry_hm_end: 1430
   meanrev:                   # RSI + Bollinger mean-reversion (StratFusion) - range regimes
     enabled: true
     bb_period: 20

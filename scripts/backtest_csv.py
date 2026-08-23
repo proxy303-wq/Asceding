@@ -34,6 +34,7 @@ from src.engine.signal_engine import MarketState, SignalEngine  # noqa: E402
 from src.market.candles import CandleSeries, resample  # noqa: E402
 from src.strategies.breakout import BreakoutStrategy  # noqa: E402
 from src.strategies.candlestick import CandlestickStrategy  # noqa: E402
+from src.strategies.levels import LevelPrimaryStrategy  # noqa: E402
 from src.strategies.meanrev import MeanReversionStrategy  # noqa: E402
 from src.strategies.contrarian import ContrarianStrategy  # noqa: E402
 from src.strategies.momentum import TrendMomentumStrategy  # noqa: E402
@@ -152,6 +153,7 @@ def main():
         TrendMomentumStrategy(cfg, cfg["strategies"]["momentum"]),
         BreakoutStrategy(cfg, cfg["strategies"]["breakout"]),
         CandlestickStrategy(cfg, cfg["strategies"]["candlestick"]),
+        LevelPrimaryStrategy(cfg, cfg["strategies"]["levels"]),
         MeanReversionStrategy(cfg, cfg["strategies"]["meanrev"]),
         ContrarianStrategy(cfg, cfg["strategies"]["contrarian"]),
     ]
@@ -175,12 +177,14 @@ def main():
         if args.days and args.days < 10000:
             cutoff = rows[-1]["timestamp"] - args.days * 86400
             rows = [r for r in rows if r["timestamp"] >= cutoff]
+        # seed only a warmup, then REPLAY one bar at a time (no look-ahead bias)
         series[name] = CandleSeries(interval_sec=args.tf * 60)
-        series[name].seed(rows)
-        for r in rows:
+        warmup = rows[:80]
+        series[name].seed(warmup)
+        for r in rows[80:]:
             all_bars.append((name, r["timestamp"], r))
         print(f"{name} {args.tf}m: {len(rows)} bars ({datetime.fromtimestamp(rows[0]['timestamp']).date()} .. "
-              f"{datetime.fromtimestamp(rows[-1]['timestamp']).date()})")
+              f"{datetime.fromtimestamp(rows[-1]['timestamp']).date()}), warmup {len(warmup)}")
     all_bars.sort(key=lambda x: (x[1], x[0]))
 
     iv_hist: dict[str, list] = {}
