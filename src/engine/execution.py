@@ -52,6 +52,19 @@ def trailing_sl(entry_price: float, current_sl: float, peak: float, profit: floa
     return round(new_sl, 2)
 
 
+def lock_trail_sl(entry_price: float, current_sl: float, peak: float, profit_pct: float,
+               arm_pct: float, trail_pct: float, breakeven_pct: float) -> float:
+    """Premium-% lock-profit trail (PrOxy sweep insight): once profit reaches
+    arm_pct% of entry premium, keep SL within trail_pct% of the peak; after
+    breakeven_pct% profit, never lose money."""
+    new_sl = current_sl
+    if profit_pct >= arm_pct:
+        new_sl = max(new_sl, peak - entry_price * trail_pct / 100.0)
+    if profit_pct >= breakeven_pct:
+        new_sl = max(new_sl, entry_price)
+    return round(new_sl, 2)
+
+
 class ExecutionManager:
     def __init__(self, broker: Broker, risk: RiskManager, store, mode: str):
         self.broker = broker
@@ -224,7 +237,12 @@ class ExecutionManager:
             peak = tr.meta["peak"]
 
             new_sl = tr.sl_price
-            if trail_on:
+            if trail_on and r_cfg.lock_enabled and tr.entry_price > 0:
+                profit_pct = profit / tr.entry_price * 100.0
+                new_sl = lock_trail_sl(tr.entry_price, tr.sl_price, peak, profit_pct,
+                                       r_cfg.lock_arm_pct, r_cfg.lock_trail_pct,
+                                       r_cfg.lock_breakeven_pct)
+            elif trail_on:
                 new_sl = trailing_sl(tr.entry_price, tr.sl_price, peak, profit, r_val,
                                      r_cfg.trail_arm_r, r_cfg.trail_step_r, r_cfg.breakeven_r)
             if new_sl != tr.sl_price:
@@ -335,12 +353,22 @@ class ExecutionManager:
             strategy=tr.strategy, entry_price=tr.entry_price, exit_price=exit_price,
             quantity=tr.qty, pnl=pnl, exit_reason=reason, meta=tr.meta,
         )
-        # label the ML sample captured at signal time with the realised outcome
+        # label the ML sample captured at signal time - barrier-based (FinLab style):
+        # label 1 if a profit barrier was hit first, 0 if the stop barrier was hit;
+        # time/reversal exits keep the pnl sign as a soft label.
         feat = tr.meta.get("ml_features")
         if feat:
             try:
+                profit_reasons = ("TARGET_HIT", "STOCK_TARGET_HIT", "LOCK_PROFIT", "REVERSAL_EXIT", "BTST_OPEN_EXIT")
+                stop_reasons = ("SL_HIT", "STOCK_SL_HIT", "TIME_STOP")
+                if reason in profit_reasons:
+                    label = 1
+                elif reason in stop_reasons:
+                    label = 0
+                else:
+                    label = 1 if pnl > 0 else 0
                 self.store.record_ml_sample(tr.strategy, tr.underlying, feat,
-                                            label=1 if pnl > 0 else 0, outcome=pnl)
+                                            label=label, outcome=pnl, exit_reason=reason)
             except Exception as e:
                 log.warning("ml sample record failed: %s", e)
         log.info("EXIT %s %s pnl=%.2f reason=%s", tr.symbol, tr.side, pnl, reason)

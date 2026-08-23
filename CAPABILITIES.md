@@ -46,12 +46,13 @@ and what is deliberately disabled for safety.
 > Note: ML gate, real-data backtester, paper/live toggle and candlestick patterns
 > are NEW and live in the build - they are listed here only with their caveats.
 
-- **ML win-probability gate (new)** - gradient-boosted classifier trained on logged
-  trades (16 features incl. RSI/EMA gaps/ATR/IV/trend-score/hour/rolling returns);
-  blocks signals below the configured P(win) threshold once >= 30 labeled samples
-  exist. Research note: the Downloads paper found LSTM best for pure price-series
-  prediction on Indian stocks; the tabular gate uses boosting (best for tabular)
-  with LSTM-style rolling-window features. A real LSTM forecaster is not yet built.
+- **ML win-probability gate (meta-labeling, MLFinLab style)** - gradient-boosted
+  classifier trained on logged trades (16 features incl. RSI/EMA gaps/ATR/IV/
+  trend-score/hour/rolling returns), barrier-labeled; blocks signals below the
+  configured P(win) threshold once >= 30 labeled samples exist. Research note:
+  the Downloads paper found LSTM best for pure price-series prediction on Indian
+  stocks; the tabular gate uses boosting (best for tabular) with LSTM-style
+  rolling-window features. A real LSTM forecaster is a future step.
 - **Real-data backtester (new)** - scripts/backtest_real.py replays actual DHAN 1m
   index history through the engine with per-strategy stats and P&L by entry hour.
   Premiums are modeled (Black-Scholes on realized vol), not broker prints.
@@ -59,6 +60,17 @@ and what is deliberately disabled for safety.
   /paper /live; LIVE uses the real DHAN account balance for sizing; the switch
   applies only when no positions are open.
 - **Candlestick patterns (new)** - 19 patterns in a dedicated strategy.
+- **Lock-profit trailing exit (from PrOxy)** - premium-% lock & trail config
+  (lock_profit: arm 0.8% / trail 0.5% / breakeven 0.4%) - the exit PrOxy's
+  sweep found converts 30% WR entries into high-win-rate results.
+- **Conviction score / confidence gate (from PrOxy)** - every signal carries a
+  0-100 conviction score (5m trend 25 + 1m trend 20 + RSI band 15 + cheap IV 15
+  + ATR expansion 15 + pattern/breakout 10); optional min_conviction filter.
+- **Barrier-based ML labeling (MLFinLab style)** - trade labels come from
+  first-touch of target (1) / stop (0) barriers, not just final P&L sign.
+- **Real-data CSV backtester** (scripts/backtest_csv.py) - replays 2 years of
+  real NIFTY/BANKNIFTY candles (PrOxy's CSVs) with Sharpe/Sortino/max-DD,
+  per-strategy and per-hour reports; used for the head-to-head validation.
 - **Stock BTST screener (new)** - screens liquid NIFTY-50 equities 15:00-15:20
   IST with live prices (trend + RSI + volume-surge + 52w-strength filters),
   deploys 50-60% of capital into the top pick immediately, holds overnight and

@@ -232,6 +232,18 @@ without credentials. A 60-day sample run: 18 trades, 44% win rate, SL/TARGET/TIM
 max DD 2.4%. **Synthetic data != real results** - use it for wiring checks, then use
 paper mode on real data.
 
+## What was merged from PrOxy + research references
+
+- **Lock-profit exit** (PrOxy's sweep insight): lock gains at 0.8% premium,
+  trail from peak - the mechanism that flips 30% WR scalping into winners.
+- **Conviction/confidence gate**: 0-100 signal score, optional min_conviction.
+- **Barrier-based ML labeling + meta-labeling** (MLFinLab / López de Prado):
+  first-touch target/stop defines labels; the ML gate filters primary signals.
+- **Real-data backtest on PrOxy's CSVs** (scripts/backtest_csv.py) with
+  Sharpe/Sortino/max-DD + per-hour analytics; PortfolioLab-style metrics.
+- Head-to-head: default exits vs PrOxy-style scalping+lock vs conviction gate on
+  identical 2-year NIFTY/BANKNIFTY data (see scripts/backtest_csv.py).
+
 ## Git + Streamlit Cloud deploy
 
 The project is on GitHub (https://github.com/proxy303-wq/Asceding). To host the

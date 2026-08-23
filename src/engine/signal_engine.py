@@ -141,6 +141,42 @@ class SignalEngine:
                     intents.append(intent)
         return intents
 
+    def _conviction_score(self, sig: Signal, st: MarketState) -> float:
+        """0-100: weighted count of independent confirmations (mirrors PrOxy's
+        confidence gate but derived from this engine's own indicators)."""
+        ind = st.indicators
+        score = 0.0
+        ef, es = ind.get("ema_fast_1m"), ind.get("ema_slow_1m")
+        ef5, es5 = ind.get("ema_fast_5m"), ind.get("ema_slow_5m")
+        r = ind.get("rsi_1m")
+        atr = ind.get("atr_1m")
+        atr_ma = ind.get("atr_ma_1m")
+        bull = sig.option_type == "CE"
+        # 5m trend agreement (25)
+        if ef5 is not None and es5 is not None:
+            if (ef5 > es5) == bull:
+                score += 25
+        # 1m trend agreement (20)
+        if ef is not None and es is not None:
+            if (ef > es) == bull:
+                score += 20
+        # RSI in the direction band (15)
+        if r is not None:
+            if bull and 50 <= r <= 72:
+                score += 15
+            elif not bull and 28 <= r <= 50:
+                score += 15
+        # cheap IV (15)
+        if st.iv_percentile <= float(sig.meta.get("iv_max", 70)):
+            score += 15
+        # ATR expansion (15)
+        if atr is not None and atr_ma and atr >= 1.05 * atr_ma:
+            score += 15
+        # volume/pattern boost (10): candlestick patterns or breakout carry weight
+        if sig.meta.get("patterns") or sig.strategy in ("breakout", "candlestick"):
+            score += 10
+        return round(min(score, 100.0), 1)
+
     def _maybe_btst(self, sig: Signal, st: MarketState, d: float):
         """Mark a late-day signal as BTST (hold overnight) when it is 'solid':
         within the BTST window, expiry far enough, and 1m+5m trend agreement
@@ -206,6 +242,13 @@ class SignalEngine:
         if st.chain is None:
             return None
         interval = float(ucfg.get("strike_interval", 50))
+        # conviction score (confidence gate): how many independent confirmations align
+        sig.meta["conviction"] = self._conviction_score(sig, st)
+        min_conv = float(self.config.get("signal_quality", {}).get("min_conviction", 0))
+        if min_conv > 0 and sig.meta["conviction"] < min_conv:
+            log.info("signal %s blocked: conviction %.0f < %.0f", sig.strategy,
+                     sig.meta["conviction"], min_conv)
+            return None
         # theta-aware strike selection: prefer ATM/ITM strikes with least time decay
         from ..market.selection import select_best_strike
         sel_cfg = self.config.get("strike_select", {})

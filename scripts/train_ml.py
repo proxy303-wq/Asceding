@@ -14,8 +14,12 @@ from src.ml.gate import MLGate  # noqa: E402
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--db", default=None, help="backtest db with ml_samples (e.g. data/bt_default.db)")
+    args = ap.parse_args()
     cfg = load_config()
-    store = Store(cfg.get("db_path", "data/trader.db"))
+    store = Store(args.db if args.db else cfg.get("db_path", "data/trader.db"))
     rows = store.ml_samples(labeled_only=True)
     print(f"labeled samples: {len(rows)}")
     if not rows:

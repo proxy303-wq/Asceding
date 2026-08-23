@@ -57,6 +57,11 @@ class RiskManager:
         self.trail_arm_r = float(trail.get("arm_after_r", 1.0))
         self.trail_step_r = float(trail.get("trail_step_r", 0.5))
         self.breakeven_r = float(trail.get("breakeven_after_r", 0.8))
+        lock = risk_cfg.get("lock_profit", {})
+        self.lock_enabled = bool(lock.get("enabled", False))
+        self.lock_arm_pct = float(lock.get("arm_pct", 0.8))
+        self.lock_trail_pct = float(lock.get("trail_pct", 0.5))
+        self.lock_breakeven_pct = float(lock.get("breakeven_pct", 0.4))
         self.halted = False
         self.halt_reason = ""
         self._day = ist_now().date().isoformat()
@@ -156,8 +161,9 @@ class RiskManager:
         cap_value = self.initial_capital * self.max_exposure_pct / 100.0 / max(1, self.max_positions)
         max_qty_by_value = int(cap_value / premium_entry)
         qty = min(lots * ls, max_qty_by_value)
-        qty = max(ls, (qty // ls) * ls)
-        return qty
+        # never round back up past the cap: floor to a full lot, or 0 if a lot doesn't fit
+        qty = (qty // ls) * ls
+        return qty if qty >= ls else 0
 
     def sl_target_prices(self, premium_entry: float, sl_pct: float | None = None):
         sl_pct = sl_pct or self.sl_pct

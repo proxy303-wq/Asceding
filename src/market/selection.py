@@ -30,17 +30,20 @@ def _score(row: OptionRow, cfg: dict) -> float:
     delta = abs(row.delta)
     # primary: theta bleed per day (normalized)
     theta_s = tp / max(theta_max, 0.5)
-    # delta band penalty: distance outside [delta_min, delta_max]
+    # delta band penalty: distance outside [delta_min, delta_max] (weighted 2x - ITM drift is costly)
     if delta_min <= delta <= delta_max:
         delta_s = 0.0
     else:
-        delta_s = min(abs(delta - delta_min), abs(delta - delta_max)) / max(delta_min, 0.1)
+        delta_s = min(abs(delta - delta_min), abs(delta - delta_max)) / max(delta_min, 0.1) * 2.0
+    # premium cost penalty: deep-ITM options cost too much for the theta saved
+    premium_s = 0.0
+    atm = float(cfg.get("_atm_premium", 0.0))
+    if atm > 0 and row.ltp > 0:
+        premium_s = max(0.0, row.ltp / atm - 1.5) * 1.5
     # liquidity penalty: prefer higher OI + volume
     liq = row.oi + row.volume
     liq_s = 0.0 if liq >= 50000 else (1.0 - liq / 50000.0) * 0.3
-    score = theta_s + 0.8 * delta_s + liq_s
-    # small ITM preference: penalty decays slightly as strike moves ITM (for calls: lower strike)
-    return score
+    return theta_s + delta_s + premium_s + liq_s
 
 
 def select_best_strike(snap: ChainSnapshot, option_type: str, interval: float,
@@ -52,6 +55,10 @@ def select_best_strike(snap: ChainSnapshot, option_type: str, interval: float,
     if mode == "fixed":
         k = hint_strike if hint_strike else atm
         return snap.get(k, option_type)
+    # reference ATM premium so the selector never drifts into unaffordable ITM strikes
+    atm_row = snap.get(atm, option_type)
+    cfg = dict(cfg)
+    cfg["_atm_premium"] = atm_row.ltp if atm_row else 0.0
     strikes = [atm + i * interval for i in range(-width, width + 1)]
     best, best_score = None, None
     for k in strikes:
@@ -60,6 +67,8 @@ def select_best_strike(snap: ChainSnapshot, option_type: str, interval: float,
             continue
         if (row.oi + row.volume) <= 0:
             continue
+        if cfg.get("_atm_premium", 0.0) > 0 and row.ltp > cfg["_atm_premium"] * 2.5:
+            continue                      # too deep ITM: premium out of budget
         s = _score(row, cfg)
         if best is None or s < best_score:
             best, best_score = row, s

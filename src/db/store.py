@@ -40,7 +40,7 @@ class Store:
         c.execute("""CREATE TABLE IF NOT EXISTS ml_samples (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts REAL, strategy TEXT, underlying TEXT,
-            features TEXT, label INTEGER, outcome REAL)""")
+            features TEXT, label INTEGER, outcome REAL, exit_reason TEXT)""")
         self.conn.commit()
 
     # ---------- signals ----------
@@ -111,12 +111,12 @@ class Store:
     # ---------- ml samples ----------
     def record_ml_sample(self, strategy: str, underlying: str, features: list,
                          label: int | None = None, outcome: float | None = None,
-                         ts: float | None = None):
+                         ts: float | None = None, exit_reason: str | None = None):
         self.conn.execute(
-            "INSERT INTO ml_samples (ts, strategy, underlying, features, label, outcome)"
-            " VALUES (?,?,?,?,?,?)",
+            "INSERT INTO ml_samples (ts, strategy, underlying, features, label, outcome, exit_reason)"
+            " VALUES (?,?,?,?,?,?,?)",
             (ts if ts is not None else time.time(), strategy, underlying,
-             json.dumps(features), label, outcome),
+             json.dumps(features), label, outcome, exit_reason),
         )
         self.conn.commit()
 

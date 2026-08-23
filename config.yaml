@@ -31,6 +31,11 @@ risk:
     arm_after_r: 1.0         # start trailing once profit >= 1R
     trail_step_r: 0.5        # keep SL within 0.5R of the peak premium
     breakeven_after_r: 0.8   # move SL to entry once profit >= 0.8R
+  lock_profit:               # premium-% lock & trail (validated in PrOxy's sweep)
+    enabled: false           # true = lock gains at arm_pct% of premium, trail from peak
+    arm_pct: 0.8
+    trail_pct: 0.5
+    breakeven_pct: 0.4
 
 instruments:
   - underlying: NIFTY
@@ -119,6 +124,7 @@ telegram:
 signal_quality:
   confirm_bars: 2            # require the signal to repeat this many evaluations before entry (anti-whipsaw)
   iv_rv_max: 0.0             # 0 = off; e.g. 1.5 = skip when IV is more than 1.5x realized vol (premium too rich)
+  min_conviction: 0          # 0 = off; e.g. 55 = only take signals with conviction score >= 55/100
 
 ml_gate:                     # ML win-probability filter (per research: sequence/ensemble models beat singletons)
   enabled: true
