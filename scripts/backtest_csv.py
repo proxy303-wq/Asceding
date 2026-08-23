@@ -100,6 +100,10 @@ def main():
     ap.add_argument("--lock", action="store_true", help="enable premium-% lock-profit trail")
     ap.add_argument("--conviction", type=float, default=None)
     ap.add_argument("--confirm", type=int, default=None, help="override signal confirmation bars")
+    ap.add_argument("--wick", type=float, default=None, help="levels: wick_atr tolerance")
+    ap.add_argument("--break", dest="break_atr", type=float, default=None, help="levels: break_atr")
+    ap.add_argument("--look", type=float, default=None, help="levels: look_atr")
+    ap.add_argument("--min-confirm", type=float, default=None, help="levels: min_confirm score")
     ap.add_argument("--no-btst-stocks", action="store_true")
     ap.add_argument("--db", default="data/backtest_csv.db")
     args = ap.parse_args()
@@ -118,6 +122,11 @@ def main():
         cfg["signal_quality"]["min_conviction"] = args.conviction
     if args.confirm is not None:
         cfg["signal_quality"]["confirm_bars"] = args.confirm
+    lv = cfg["strategies"]["levels"]
+    if args.wick is not None: lv["wick_atr"] = args.wick
+    if args.break_atr is not None: lv["break_atr"] = args.break_atr
+    if args.look is not None: lv["look_atr"] = args.look
+    if args.min_confirm is not None: lv["min_confirm"] = args.min_confirm
     cfg["stock_btst"]["enabled"] = not args.no_btst_stocks
     for s in cfg.get("strategies", {}).values():
         s["enabled"] = s.get("enabled", True)
