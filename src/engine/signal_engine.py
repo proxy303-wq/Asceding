@@ -28,6 +28,7 @@ class MarketState:
     iv_percentile: float = 50.0
     indicators: dict = field(default_factory=dict)
     underlying_cfg: dict = field(default_factory=dict)
+    regime: str = "RANGE"
 
 
 @dataclass
@@ -100,8 +101,13 @@ class SignalEngine:
             self._pending = {k: v for k, v in self._pending.items() if ts_now - v[0] <= 300}
         for st in states:
             ucfg = st.underlying_cfg or self._underlying_cfg(st.underlying)
+            st.regime = self._detect_regime(st)
             for strat in self.strategies:
                 if not strat.enabled():
+                    continue
+                from ..analytics.regime import REGIME_STRATEGY_MAP
+                allowed = REGIME_STRATEGY_MAP.get(strat.name, set())
+                if allowed and st.regime not in allowed:
                     continue
                 ctx = StrategyContext(
                     underlying=st.underlying, spot=st.spot, ts=st.ts,
@@ -140,6 +146,21 @@ class SignalEngine:
                     self._last_signal[key] = st.ts
                     intents.append(intent)
         return intents
+
+    def _detect_regime(self, st: MarketState) -> str:
+        try:
+            from ..analytics.regime import detect_regime
+            ind = st.indicators
+            spot = st.spot or 0.0
+            atr_pct = (ind.get("atr_1m") or 0.0) / spot * 100.0 if spot else 0.0
+            atr_pct_avg = (ind.get("atr_ma_1m") or 0.0) / spot * 100.0 if spot else 0.0
+            s = st.series_1m
+            return detect_regime(s.closes() if s else [], s.highs() if s else [],
+                                 s.lows() if s else [], ind.get("adx_5m"),
+                                 ind.get("ema_slow_5m"), ind.get("ema_slow_prev_5m"),
+                                 atr_pct, atr_pct_avg)
+        except Exception:
+            return "RANGE"
 
     def _conviction_score(self, sig: Signal, st: MarketState) -> float:
         """0-100: weighted count of independent confirmations (mirrors PrOxy's

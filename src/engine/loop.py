@@ -24,6 +24,7 @@ from ..market.chain import ChainService
 from ..market.instruments import InstrumentMaster, Underlying, atm_strike, dte, expiry_by_rank
 from ..strategies.breakout import BreakoutStrategy
 from ..strategies.candlestick import CandlestickStrategy
+from ..strategies.meanrev import MeanReversionStrategy
 from ..strategies.contrarian import ContrarianStrategy
 from ..telegram import TelegramCommander, TelegramNotifier
 from ..strategies.base import Signal
@@ -66,6 +67,7 @@ class AutoTrader:
             TrendMomentumStrategy(self.cfg, strat_cfg.get("momentum", {})),
             BreakoutStrategy(self.cfg, strat_cfg.get("breakout", {})),
             CandlestickStrategy(self.cfg, strat_cfg.get("candlestick", {})),
+            MeanReversionStrategy(self.cfg, strat_cfg.get("meanrev", {})),
             ContrarianStrategy(self.cfg, strat_cfg.get("contrarian", {})),
         ]
         self.signal_engine = SignalEngine(self.strategies, self.risk, self.cfg["instruments"], self.cfg)
@@ -319,7 +321,9 @@ class AutoTrader:
         c5, h5, l5 = s5.closes(), s5.highs(), s5.lows()
         if len(c5) >= 25:
             out["ema_fast_5m"] = float(ta.ema(c5, 9)[-1])
-            out["ema_slow_5m"] = float(ta.ema(c5, 21)[-1])
+            es5 = ta.ema(c5, 21)
+            out["ema_slow_5m"] = float(es5[-1])
+            out["ema_slow_prev_5m"] = float(es5[-2]) if len(es5) > 1 and es5[-2] == es5[-2] else None
             out["atr_5m"] = float(ta.atr(h5, l5, c5, 14)[-1])
             out["adx_5m"] = float(ta.adx(h5, l5, c5, 14)[-1])
         orh, orl = self._or_bounds_for(u)

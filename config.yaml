@@ -91,6 +91,16 @@ strategies:
     strike_offset: 1
     sl_atr_mult: 0.40
     max_hold_min: 150
+  meanrev:                   # RSI + Bollinger mean-reversion (StratFusion) - range regimes
+    enabled: true
+    bb_period: 20
+    bb_mult: 2.0
+    rsi_overbought: 72
+    rsi_oversold: 28
+    iv_max_percentile: 70
+    strike_offset: 1
+    entry_hm_start: 1000
+    entry_hm_end: 1430
   candlestick:               # reversal patterns in trend-pullback context
     enabled: true
     use_5m: true              # detect patterns on 5m candles (less noise than 1m)

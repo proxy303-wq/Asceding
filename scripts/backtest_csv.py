@@ -34,6 +34,7 @@ from src.engine.signal_engine import MarketState, SignalEngine  # noqa: E402
 from src.market.candles import CandleSeries, resample  # noqa: E402
 from src.strategies.breakout import BreakoutStrategy  # noqa: E402
 from src.strategies.candlestick import CandlestickStrategy  # noqa: E402
+from src.strategies.meanrev import MeanReversionStrategy  # noqa: E402
 from src.strategies.contrarian import ContrarianStrategy  # noqa: E402
 from src.strategies.momentum import TrendMomentumStrategy  # noqa: E402
 
@@ -97,6 +98,7 @@ def main():
     ap.add_argument("--exit", default=None)
     ap.add_argument("--lock", action="store_true", help="enable premium-% lock-profit trail")
     ap.add_argument("--conviction", type=float, default=None)
+    ap.add_argument("--confirm", type=int, default=None, help="override signal confirmation bars")
     ap.add_argument("--no-btst-stocks", action="store_true")
     ap.add_argument("--db", default="data/backtest_csv.db")
     args = ap.parse_args()
@@ -113,6 +115,8 @@ def main():
         cfg["risk"]["lock_profit"]["enabled"] = True
     if args.conviction is not None:
         cfg["signal_quality"]["min_conviction"] = args.conviction
+    if args.confirm is not None:
+        cfg["signal_quality"]["confirm_bars"] = args.confirm
     cfg["stock_btst"]["enabled"] = not args.no_btst_stocks
     for s in cfg.get("strategies", {}).values():
         s["enabled"] = s.get("enabled", True)
@@ -148,6 +152,7 @@ def main():
         TrendMomentumStrategy(cfg, cfg["strategies"]["momentum"]),
         BreakoutStrategy(cfg, cfg["strategies"]["breakout"]),
         CandlestickStrategy(cfg, cfg["strategies"]["candlestick"]),
+        MeanReversionStrategy(cfg, cfg["strategies"]["meanrev"]),
         ContrarianStrategy(cfg, cfg["strategies"]["contrarian"]),
     ]
     engine = SignalEngine(strategies, risk, cfg["instruments"], cfg)
@@ -227,7 +232,9 @@ def main():
         c5, h5, l5 = s5.closes(), s5.highs(), s5.lows()
         if len(c5) >= 25:
             ind["ema_fast_5m"] = float(ta.ema(c5, 9)[-1])
-            ind["ema_slow_5m"] = float(ta.ema(c5, 21)[-1])
+            es5 = ta.ema(c5, 21)
+            ind["ema_slow_5m"] = float(es5[-1])
+            ind["ema_slow_prev_5m"] = float(es5[-2]) if len(es5) > 1 and es5[-2] == es5[-2] else None
             ind["atr_5m"] = float(ta.atr(h5, l5, c5, 14)[-1])
             ind["adx_5m"] = float(ta.adx(h5, l5, c5, 14)[-1])
         # opening range: first 15 min of the day
