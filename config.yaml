@@ -20,7 +20,7 @@ risk:
   default_sl_pct: 0.30       # default stop-loss as % of option premium (long options)
   reward_risk: 1.8           # take-profit = entry_risk * reward_risk
   time_exit: "15:05"         # flatten all intraday positions by this time
-  no_new_entries_after: "15:00"
+  no_new_entries_after: "14:30"   # options trading window: entries only 09:30-14:30 IST
   max_dte: 7                 # only trade expiries up to this many days away
   min_dte: 0.1               # skip entries when less than this many days to expiry (~last 2.5h of expiry day)
   max_consecutive_losses: 2  # after N losses in a row, halt new entries for the day (anti-tilt)
@@ -78,8 +78,8 @@ strategies:
     strike_offset: 1         # 1 = ATM+1 strike for calls / ATM-1 for puts
     sl_atr_mult: 0.35        # spot SL below entry trigger (x ATR)
     use_delta_sl: false      # true = convert spot SL to premium via entry delta (tighter, more stops)
-    entry_hm_start: 925      # only take entries between 09:25 and...
-    entry_hm_end: 1330       # ...13:30 IST (avoid late-day chop)
+    entry_hm_start: 930      # options window: entries 09:30-14:30 IST
+    entry_hm_end: 1430
     max_hold_min: 120
   breakout:                  # opening-range / prior-day breakout with OI + volume confirm
     enabled: true
@@ -99,7 +99,7 @@ strategies:
     rsi_oversold: 28
     iv_max_percentile: 70
     strike_offset: 1
-    entry_hm_start: 1000
+    entry_hm_start: 930
     entry_hm_end: 1430
   candlestick:               # reversal patterns in trend-pullback context
     enabled: true
@@ -110,8 +110,8 @@ strategies:
     trend_confirmation: 0.6   # >=60% of prior bars must be against the reversal
     iv_max_percentile: 70
     strike_offset: 1
-    entry_hm_start: 925
-    entry_hm_end: 1400
+    entry_hm_start: 930
+    entry_hm_end: 1430
   contrarian:                # premium selling when IV is rich + market range-bound
     enabled: false           # OFF by default: margin-intensive, needs careful risk
     iv_min_percentile: 82
