@@ -232,6 +232,27 @@ without credentials. A 60-day sample run: 18 trades, 44% win rate, SL/TARGET/TIM
 max DD 2.4%. **Synthetic data != real results** - use it for wiring checks, then use
 paper mode on real data.
 
+## Git + Streamlit Cloud deploy
+
+The project is on GitHub (https://github.com/proxy303-wq/Asceding). To host the
+dashboard on Streamlit Cloud:
+
+1. **The trading loop must run on YOUR machine/VPS** - Streamlit Cloud is UI-only
+   and cannot run a long-lived trading process (or hold your DHAN credentials).
+2. **Sync live state to the repo** so the hosted app can read it (no credentials
+   in the sync files - market state/equity/positions only):
+   ```bash
+   python scripts/sync_remote.py     # push data/sync -> sync/ -> origin/main
+   # run this every 5-10 min (task scheduler/cron) during market hours
+   ```
+3. **Deploy**: push the repo, connect it on share.streamlit.io, entry point
+   `src/dashboard/streamlit_app.py`. The app falls back to
+   `remote_state_url` (jsDelivr CDN of sync/state.json, ~10 min cache) when no
+   local state.json exists - so the hosted app shows the loop's live state.
+4. Auto-refresh is every 5s inside the app; CDN cache adds ~10 min lag.
+
+Local quick view (no deploy needed): `streamlit run src/dashboard/streamlit_app.py`
+
 ## Going live responsibly
 
 1. Paper trade >= 2-4 weeks; review the SQLite trades + equity curve on the dashboard.

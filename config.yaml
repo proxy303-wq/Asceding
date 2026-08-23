@@ -133,7 +133,7 @@ strike_select:
   theta_max_pct: 2.0         # flag strikes bleeding more than this % of premium per day
   width: 3                   # consider ATM +-3 strikes
 
-remote_state_url: ""          # for hosted dashboards: raw.githubusercontent/jsDelivr URL of sync/state.json
+remote_state_url: "https://cdn.jsdelivr.net/gh/proxy303-wq/Asceding@main/sync/state.json"  # hosted dashboard state
                                  # (e.g. https://cdn.jsdelivr.net/gh/USER/REPO@main/sync/state.json)
 
 event_blackout:               # skip new entries on high-impact dates (data/event_blackout.json)
