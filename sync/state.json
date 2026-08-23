@@ -1,0 +1,19 @@
+{
+ "ts": 1787508402.621166,
+ "mode": "paper",
+ "market_open": false,
+ "auto": true,
+ "cash": 500000.0,
+ "equity": 500000.0,
+ "day_pnl": 0.0,
+ "trades_today": 0,
+ "win_rate_today": 0.0,
+ "halted": false,
+ "halt_reason": "",
+ "open_positions": [],
+ "recent_signals": [],
+ "equity_curve": [],
+ "chains": {},
+ "expiries": {},
+ "note": "deploy test snapshot - replaced by live syncs"
+}
