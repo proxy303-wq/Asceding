@@ -35,6 +35,33 @@ def _write_json(path: Path, data):
     os.replace(tmp, path)
 
 
+# ---------------- remote sync (Streamlit Cloud / hosting) ----------------
+SYNC_DIR = DATA_DIR / "sync"
+
+
+def publish_sync_files(state: dict):
+    """Write state.json + a trades snapshot into sync/ so scripts/sync_remote.py
+    can push them to a public/private repo for a hosted dashboard to read."""
+    try:
+        SYNC_DIR.mkdir(parents=True, exist_ok=True)
+        (SYNC_DIR / "state.json").write_text(json.dumps(state, indent=1, default=str),
+                                             encoding="utf-8")
+    except Exception as e:
+        log.warning("sync write failed: %s", e)
+
+
+def read_remote_state(url: str) -> dict:
+    """Fetch state.json from a remote URL (raw.githubusercontent / jsDelivr)."""
+    try:
+        import requests
+        resp = requests.get(url, timeout=15)
+        if resp.status_code == 200:
+            return json.loads(resp.text)
+    except Exception as e:
+        log.warning("remote state fetch failed: %s", e)
+    return {}
+
+
 # ---------------- loop -> clients ----------------
 def publish_state(state: dict):
     state["ts"] = time.time()

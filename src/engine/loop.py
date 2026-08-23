@@ -886,6 +886,7 @@ class AutoTrader:
             "chains": chains_state,
             "expiries": self._expiries_state(),
         })
+        bridge.publish_sync_files(bridge.read_state())
         log.info("[cycle] mode=%s equity=%.0f day_pnl=%.0f trades=%d open=%d | %s",
                  self.mode, equity, stats["pnl"] + unreal, stats["trades"],
                  len(self.exec_mgr.open),

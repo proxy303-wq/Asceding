@@ -23,6 +23,9 @@ __pycache__/
 # ---- reference clones (not part of this project) ----
 analysis/
 
+# ---- remote-sync snapshots (force-added by scripts/sync_remote.py only) ----
+sync/
+
 # ---- model / db artifacts ----
 *.pkl
 *.db

@@ -31,6 +31,13 @@ _store = Store(_cfg.get("db_path", "data/trader.db"))
 def load_state() -> dict:
     s = bridge.read_state()
     if not s:
+        url = _cfg.get("remote_state_url", "")
+        if url:
+            remote = bridge.read_remote_state(url)
+            if remote:
+                remote["running"] = True
+                remote["remote"] = True
+                return remote
         s = {"running": False, "mode": _cfg.get("mode", "paper")}
     else:
         s["running"] = True
