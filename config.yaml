@@ -1,0 +1,167 @@
+# ============================================================
+#  dhan-auto-trader configuration
+#  Personal portfolio manager for NIFTY / BANKNIFTY options
+#  Budget: 5,00,000 INR. Paper trade first. Real money = risk.
+# ============================================================
+mode: paper            # paper | live
+timezone: Asia/Kolkata
+
+capital:
+  initial: 500000            # 5 Lakh INR
+  max_exposure_pct: 40       # max % of capital deployed in open positions
+  max_positions: 3           # concurrent position legs
+
+risk:
+  risk_per_trade: 3000       # max INR loss budget per trade
+  daily_loss_limit: 5000     # halt new entries once daily realised+unrealised loss hits this
+  daily_profit_target: 6000  # 5k/day min: stop new entries once this is locked in (0 = disabled)
+  max_daily_trades: 6        # max round trips per day
+  max_drawdown_pct: 4.0      # halt for the day if equity drops this % from day start
+  default_sl_pct: 0.30       # default stop-loss as % of option premium (long options)
+  reward_risk: 1.8           # take-profit = entry_risk * reward_risk
+  time_exit: "15:05"         # flatten all intraday positions by this time
+  no_new_entries_after: "15:00"
+  max_dte: 7                 # only trade expiries up to this many days away
+  min_dte: 0.1               # skip entries when less than this many days to expiry (~last 2.5h of expiry day)
+  max_consecutive_losses: 2  # after N losses in a row, halt new entries for the day (anti-tilt)
+  exit_mode: "trail_and_reversal"   # target | trail | reversal | trail_and_reversal
+  target_mult_r: 2.5         # backstop target in R (only used when exit_mode includes a target)
+  trailing:
+    enabled: true
+    arm_after_r: 1.0         # start trailing once profit >= 1R
+    trail_step_r: 0.5        # keep SL within 0.5R of the peak premium
+    breakeven_after_r: 0.8   # move SL to entry once profit >= 0.8R
+
+instruments:
+  - underlying: NIFTY
+    security_id: 26000       # F&O underlying id for the option-chain API (index id 13 auto-resolved)
+    segment: NSE_FNO          # segment for option-chain / expiry-list APIs
+    expiry: nearest          # nearest | next
+    lot_size: 65             # NIFTY lot (65 per current NSE spec; scrip master auto-verifies)
+    strike_interval: 50
+  - underlying: BANKNIFTY
+    security_id: 26009       # F&O underlying id for the option-chain API (index id 25 auto-resolved)
+    segment: NSE_FNO
+    expiry: nearest
+    lot_size: 30             # BANKNIFTY lot (30 per current NSE spec; scrip master auto-verifies)
+    strike_interval: 100
+
+feed:
+  quote_interval_sec: 5      # LTP poll cadence (REST; 1 req/s allowed)
+  chain_interval_sec: 30     # option chain refresh cadence (min 3s per underlying)
+  candle_interval: 1m        # signal candle timeframe: 1m | 5m
+  history_intraday_days: 5   # days of 1m history to warm up indicators
+  history_daily_days: 90     # days of daily history for IV percentile & ranges
+  use_websocket: true        # use WS tick feed for live mode (paper uses REST poll)
+  expiry_policy: dte_window  # nearest | dte_window (skip theta-trap expiries, prefer 2-5 days out)
+  expiry_min_dte: 1.0        # don't SELECT expiries with less than this many days left
+  prefer_dte_min: 2
+  prefer_dte_max: 5
+
+strategies:
+  momentum:                  # trend + IV filter: buy ATM/OTM options on trend start
+    enabled: true
+    ema_fast: 9
+    ema_slow: 21
+    rsi_period: 14
+    rsi_min: 52
+    rsi_max: 80
+    atr_period: 14
+    min_atr_expansion: 1.05   # require ATR vs 20-bar average (volatility expansion)
+    atr_pullback_mult: 0.5   # allowed pullback depth into EMA zone (x ATR)
+    iv_max_percentile: 70    # skip entry when IV percentile above this (premium too rich)
+    strike_offset: 1         # 1 = ATM+1 strike for calls / ATM-1 for puts
+    sl_atr_mult: 0.35        # spot SL below entry trigger (x ATR)
+    use_delta_sl: false      # true = convert spot SL to premium via entry delta (tighter, more stops)
+    entry_hm_start: 925      # only take entries between 09:25 and...
+    entry_hm_end: 1330       # ...13:30 IST (avoid late-day chop)
+    max_hold_min: 120
+  breakout:                  # opening-range / prior-day breakout with OI + volume confirm
+    enabled: true
+    or_minutes: 15           # opening range measured over first N minutes
+    breakout_atr_mult: 0.30  # breakout must exceed range by x ATR of spot
+    oi_confirm: true         # require OI build-up on the breakout side
+    vol_surge_mult: 1.5      # volume vs 20-bar average
+    iv_max_percentile: 70
+    strike_offset: 1
+    sl_atr_mult: 0.40
+    max_hold_min: 150
+  candlestick:               # reversal patterns in trend-pullback context
+    enabled: true
+    use_5m: true              # detect patterns on 5m candles (less noise than 1m)
+    rsi_max_bull: 45          # bullish reversals need RSI <= this (oversold-ish)
+    rsi_min_bear: 55          # bearish reversals need RSI >= this (overbought-ish)
+    trend_bars: 8
+    trend_confirmation: 0.6   # >=60% of prior bars must be against the reversal
+    iv_max_percentile: 70
+    strike_offset: 1
+    entry_hm_start: 925
+    entry_hm_end: 1400
+  contrarian:                # premium selling when IV is rich + market range-bound
+    enabled: false           # OFF by default: margin-intensive, needs careful risk
+    iv_min_percentile: 82
+    adx_max: 22
+    width_sigma: 1.5         # strangle width in ATM-vol sigma
+    sl_premium_pct: 25       # exit if premium moves +25% against
+    target_premium_pct: 35   # exit when premium decays 35%
+    max_hold_min: 240
+
+telegram:
+  enabled: true              # false to disable all Telegram traffic
+  chat_id: ""                # optional override; defaults to TELEGRAM_CHAT_ID from .env
+  notify:
+    entry: true
+    exit: true
+    halt: true
+    daily: true
+    heartbeat_min: 0         # 0 = off; e.g. 30 = status ping every 30 minutes
+
+signal_quality:
+  confirm_bars: 2            # require the signal to repeat this many evaluations before entry (anti-whipsaw)
+  iv_rv_max: 0.0             # 0 = off; e.g. 1.5 = skip when IV is more than 1.5x realized vol (premium too rich)
+
+ml_gate:                     # ML win-probability filter (per research: sequence/ensemble models beat singletons)
+  enabled: true
+  threshold: 0.55            # block signals with P(win) below this
+  min_train_samples: 30
+  auto_retrain: true         # retrain at each day close when new labeled trades exist
+
+strike_select:
+  mode: theta_optimized      # fixed | theta_optimized (pick ATM/ITM strike with least time decay)
+  delta_min: 0.30            # preferred delta band (|delta|)
+  delta_max: 0.70
+  theta_max_pct: 2.0         # flag strikes bleeding more than this % of premium per day
+  width: 3                   # consider ATM +-3 strikes
+
+event_blackout:               # skip new entries on high-impact dates (data/event_blackout.json)
+  enabled: false
+
+stock_btst:                   # STOCK BTST screener (equities, not options)
+  enabled: true
+  allocation_pct: 55         # 50-60% of capital deployed into the BTST stock position
+  min_price: 50
+  min_avg_volume: 200000     # 20-day average volume (shares)
+  vol_mult: 1.5              # today's volume must be >= this x 20d average
+  rsi_min: 52
+  rsi_max: 72
+  strength_min: 0.92         # close within 8% of 60-day high
+  max_positions: 1
+  sl_pct: 2.5                # stop loss below entry (stock price)
+  target_pct: 5.0            # take profit above entry
+  screen_hm_start: 1500      # screen BETWEEN 15:00 and 15:20 IST (market still open)
+  screen_hm_end: 1520        # buy the pick immediately at ~3-3:20 PM, hold overnight
+  exit_hm: 950               # next morning: force-sell by 09:50 (SL/target handled live)
+  universe: []               # empty = built-in liquid NIFTY-50 list; or data/stock_universe.csv
+
+btst:                        # buy today, sell tomorrow - only on solid late-day signals
+  enabled: true
+  entry_hm_start: 1400       # only signals in this window may be held overnight
+  entry_hm_end: 1500
+  min_dte: 1.5               # never hold near-expiry options overnight (theta + gap risk)
+  require_strong: true       # require 1m+5m EMA agreement in signal direction, RSI not extreme
+  exit_hm: 945               # next-morning force-exit time
+  hold_if_profit_r: 1.0      # at the open: hold till exit_hm if already >= 1R, else exit now
+
+db_path: data/trader.db
+log_level: INFO
+logs_dir: logs

@@ -1,0 +1,7 @@
+{
+  "_readme": "High-impact dates where the bot skips new entries. Fill real dates (India budget, RBI policy, FOMC, stock results you hold). Date format YYYY-MM-DD.",
+  "events": [
+    { "date": "2026-02-01", "label": "Union Budget" },
+    { "date": "2026-02-01", "label": "Budget - stock BTST also off" }
+  ]
+}

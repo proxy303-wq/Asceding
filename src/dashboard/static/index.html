@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dhan-auto-trader · Portfolio Manager</title>
+<style>
+  :root{ --bg:#0a0e17; --surface:#111827; --surface2:#1a2332; --border:#243044;
+         --text:#e5e7eb; --muted:#9ca3af; --accent:#3b82f6; --up:#10b981; --down:#ef4444;
+         --warn:#f59e0b; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ background:var(--bg); color:var(--text); font-family:ui-monospace,'Cascadia Code',Menlo,monospace; padding:24px; }
+  h1{ font-size:18px; margin-bottom:4px; } .sub{ color:var(--muted); font-size:12px; margin-bottom:20px; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; }
+  .card .label{ color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+  .card .value{ font-size:22px; margin-top:6px; font-weight:600; }
+  .up{ color:var(--up); } .down{ color:var(--down); } .warn{ color:var(--warn); }
+  .badge{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; }
+  .badge.ok{ background:#10b98120; color:var(--up); } .badge.bad{ background:#ef444420; color:var(--down); }
+  .badge.warn{ background:#f59e0b20; color:var(--warn); } .badge.info{ background:#3b82f620; color:var(--accent); }
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:20px; }
+  .panel h2{ font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th,td{ text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); }
+  th{ color:var(--muted); font-weight:500; }
+  svg{ width:100%; height:180px; display:block; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:900px){ .row2{ grid-template-columns:1fr; } }
+  .muted{ color:var(--muted); }
+</style>
+</head>
+<body>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+    <div>
+      <h1>dhan-auto-trader · portfolio manager</h1>
+      <div class="sub" id="sub">connecting…</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="modeBadge" class="badge info">mode ?</span>
+      <button id="toggleMode">switch to LIVE</button>
+    </div>
+  </div>
+
+  <div class="grid" id="cards"></div>
+
+  <div class="panel">
+    <h2>equity curve (day)</h2>
+    <svg id="chart" viewBox="0 0 800 180" preserveAspectRatio="none"></svg>
+  </div>
+
+  <div class="panel">
+    <h2>expiries — active selection highlighted (avoids theta-trap expiries)</h2>
+    <div id="expiries"></div>
+  </div>
+
+  <div class="panel">
+    <h2>option chain (ATM ±3) — theta % per day — prefer low θ for entries</h2>
+    <div id="chains"></div>
+  </div>
+
+  <div class="row2">
+    <div class="panel">
+      <h2>open positions</h2>
+      <table><thead><tr><th>symbol</th><th>side</th><th>qty</th><th>entry</th><th>sl</th><th>target</th><th>delta</th><th>IV</th><th>unrealized</th></tr></thead>
+      <tbody id="pos"></tbody></table>
+    </div>
+    <div class="panel">
+      <h2>recent signals</h2>
+      <table><thead><tr><th>time</th><th>strategy</th><th>symbol</th><th>side</th><th>reason</th></tr></thead>
+      <tbody id="sigs"></tbody></table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>today's closed trades</h2>
+    <table><thead><tr><th>time</th><th>symbol</th><th>strategy</th><th>entry</th><th>exit</th><th>qty</th><th>pnl</th><th>exit reason</th></tr></thead>
+    <tbody id="trades"></tbody></table>
+  </div>
+
+<script>
+function fmt(n){ return (n===null||n===undefined||isNaN(n)) ? '\u2014' : '\u20B9' + Number(n).toLocaleString('en-IN',{maximumFractionDigits:0}); }
+function fmt2(n){ return (n===null||n===undefined||isNaN(n)) ? '\u2014' : '\u20B9' + Number(n).toLocaleString('en-IN',{maximumFractionDigits:2}); }
+function fmtT(ts){ return ts ? new Date(ts*1000).toLocaleTimeString('en-IN',{hour12:false}) : '\u2014'; }
+
+function render(s){
+  document.getElementById('sub').textContent =
+    'mode ' + s.mode + ' \u00B7 market ' + (s.market_open?'open':'closed') +
+    ' \u00B7 auto-trading ' + (s.auto?'ON':'PAUSED') + ' \u00B7 updated ' + fmtT(s.ts);
+  var pnl = s.day_pnl || 0;
+  var cls = pnl>=0 ? 'up' : 'down';
+  var halt = s.halted
+    ? '<span class="badge bad">HALTED</span>' + (s.halt_reason ? '<div class="muted" style="font-size:11px">' + s.halt_reason + '</div>' : '')
+    : '<span class="badge ok">ACTIVE</span>';
+  document.getElementById('cards').innerHTML =
+    '<div class="card"><div class="label">equity</div><div class="value">' + fmt(s.equity) + '</div></div>' +
+    '<div class="card"><div class="label">cash</div><div class="value">' + fmt(s.cash) + '</div></div>' +
+    '<div class="card"><div class="label">day p&l</div><div class="value ' + cls + '">' + (pnl>=0?'+':'') + fmt2(pnl) + '</div></div>' +
+    '<div class="card"><div class="label">trades today</div><div class="value">' + (s.trades_today||0) + ' <span class="muted" style="font-size:12px">win ' + (s.win_rate_today||0) + '%</span></div></div>' +
+    '<div class="card"><div class="label">open positions</div><div class="value">' + (s.open_positions||[]).length + '</div></div>' +
+    '<div class="card"><div class="label">risk state</div><div class="value">' + halt + '</div></div>';
+
+  var eq = (s.equity_curve||[]).filter(function(p){ return p && p.equity; });
+  var svg = document.getElementById('chart');
+  if (eq.length > 1){
+    var W=800, H=180, pad=8;
+    var vs = eq.map(function(p){ return p.equity; });
+    var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs), rg = (mx-mn) || 1;
+    var pts = eq.map(function(p,i){
+      return (pad + i*(W-2*pad)/(eq.length-1)) + ',' + (H-pad - (p.equity-mn)/rg*(H-2*pad));
+    }).join(' ');
+    svg.innerHTML = '<polyline points="' + pts + '" fill="none" stroke="#3b82f6" stroke-width="2"/>' +
+      '<text x="' + (W-150) + '" y="14" fill="#9ca3af" font-size="10">' + fmt(mn) + ' \u2026 ' + fmt(mx) + '</text>';
+  } else {
+    svg.innerHTML = '<text x="20" y="90" fill="#9ca3af" font-size="12">no equity data yet</text>';
+  }
+
+  var expEl = document.getElementById('expiries');
+  var expKeys = Object.keys(s.expiries || {});
+  if (expKeys.length === 0){
+    expEl.innerHTML = '<span class="muted">no expiry data yet</span>';
+  } else {
+    var expHtml = '';
+    expKeys.forEach(function(u){
+      var rows = (s.expiries[u]||[]).map(function(e){
+        var badge = e.selected ? ' <span class="badge ok">ACTIVE</span>' : '';
+        var iv = e.iv_atm ? (e.iv_atm*100).toFixed(1) + '%' : '—';
+        return '<tr><td>' + e.expiry + badge + '</td><td class="muted">' + e.dte + ' days</td><td class="muted">' + iv + '</td></tr>';
+      }).join('');
+      expHtml += '<h3 style="font-size:12px;color:var(--accent);margin:8px 0 4px">' + u + '</h3>' +
+        '<table><thead><tr><th>expiry</th><th>DTE</th><th>ATM IV</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    });
+    expEl.innerHTML = expHtml;
+  }
+
+  var chainsEl = document.getElementById('chains');
+  var chainKeys = Object.keys(s.chains || {});
+  if (chainKeys.length === 0){
+    chainsEl.innerHTML = '<span class="muted">no chain snapshot yet</span>';
+  } else {
+    var html = '';
+    chainKeys.forEach(function(u){
+      var rows = (s.chains[u]||[]).map(function(r){
+        function cell(c){
+          if (!c) return '<td class="muted">—</td>';
+          var cls = c.theta_pct > 2 ? ' class="warn"' : '';
+          return '<td>' + c.ltp + '</td><td class="muted">' + c.delta.toFixed(2) + '</td>' +
+                 '<td' + cls + '>' + c.theta_pct + '%</td><td class="muted">' + (c.iv*100).toFixed(1) + '%</td>';
+        }
+        var ce = cell(r.CE), pe = cell(r.PE);
+        var itm = (r.itm_delta||0);
+        var itmCls = itm < 0 ? ' class="up"' : (itm > 0 ? ' class="down"' : '');
+        return '<tr><td>' + r.strike + '<span class="muted" style="font-size:10px">' + (itm? ' ('+itm+')' : ' ATM') + '</span></td>' +
+               '<td colspan="4" style="border-right:1px solid var(--border)"><table style="width:100%"><tr>' + ce + '</tr></table></td>' +
+               '<td colspan="4"><table style="width:100%"><tr>' + pe + '</tr></table></td></tr>';
+      }).join('');
+      html += '<h3 style="font-size:12px;color:var(--accent);margin:8px 0 4px">' + u + '  <span class="muted">CE | Δ | θ% | IV   ·   PE | Δ | θ% | IV</span></h3>' +
+              '<table><thead><tr><th>strike</th><th colspan="4" style="border-right:1px solid var(--border)">CALLS</th><th colspan="4">PUTS</th></tr></thead>' +
+              '<tbody>' + rows + '</tbody></table>';
+    });
+    chainsEl.innerHTML = html;
+  }
+
+  var posRows = (s.open_positions||[]).map(function(p){
+    var sideCls = p.side==='BUY' ? 'ok' : 'warn';
+    var pnlCls = (p.unrealized||0)>=0 ? 'up' : 'down';
+    var btstBadge = p.btst ? ' <span class="badge warn">BTST</span>' : '';
+    var segBadge = p.segment === 'EQ' ? ' <span class="badge info">STOCK</span>' : '';
+    var g = p.greeks || {};
+    var delta = (typeof g.delta === 'number' && !isNaN(g.delta)) ? g.delta.toFixed(2) : '\u2014';
+    var iv = (typeof g.iv === 'number' && g.iv > 0) ? (g.iv*100).toFixed(1) + '%' : '\u2014';
+    return '<tr><td>' + p.symbol + ' ' + p.strike + btstBadge + segBadge + '</td><td><span class="badge ' + sideCls + '">' + p.side + '</span></td>' +
+      '<td>' + p.qty + '</td><td>' + fmt2(p.entry_price) + '</td><td class="down">' + fmt2(p.sl_price) + '</td>' +
+      '<td class="up">' + fmt2(p.target_price) + '</td><td>' + delta + '</td><td class="muted">' + iv + '</td>' +
+      '<td class="' + pnlCls + '">' + fmt2(p.unrealized) + '</td></tr>';
+  }).join('');
+  document.getElementById('pos').innerHTML = posRows || '<tr><td colspan="7" class="muted">no open positions</td></tr>';
+
+  var sigRows = (s.recent_signals||[]).map(function(x){
+    var dirCls = x.direction==='BUY' ? 'up' : 'down';
+    return '<tr><td>' + fmtT(x.ts) + '</td><td><span class="badge info">' + x.strategy + '</span></td>' +
+      '<td>' + x.underlying + ' ' + x.option_type + ' ' + x.strike + '</td>' +
+      '<td class="' + dirCls + '">' + x.direction + '</td><td class="muted">' + (x.reason||'') + '</td></tr>';
+  }).join('');
+  document.getElementById('sigs').innerHTML = sigRows || '<tr><td colspan="5" class="muted">no signals yet</td></tr>';
+}
+
+function loadTrades(){
+  fetch('/api/trades').then(function(r){ return r.json(); }).then(function(j){
+    var rows = (j.trades||[]).map(function(t){
+      var cls = t.pnl>=0 ? 'up' : 'down';
+      return '<tr><td>' + fmtT(t.ts) + '</td><td>' + t.symbol + ' ' + t.strike + '</td><td><span class="badge info">' + t.strategy + '</span></td>' +
+        '<td>' + fmt2(t.entry_price) + '</td><td>' + fmt2(t.exit_price) + '</td><td>' + t.quantity + '</td>' +
+        '<td class="' + cls + '">' + fmt2(t.pnl) + '</td><td class="muted">' + t.exit_reason + '</td></tr>';
+    }).join('');
+    document.getElementById('trades').innerHTML = rows || '<tr><td colspan="8" class="muted">no closed trades yet</td></tr>';
+  }).catch(function(){});
+}
+
+var currentMode = 'paper';
+function setModeBtn(){
+  var b = document.getElementById('toggleMode');
+  var badge = document.getElementById('modeBadge');
+  if (currentMode === 'live'){
+    b.textContent = 'switch to PAPER';
+    badge.textContent = 'LIVE - real DHAN balance';
+    badge.className = 'badge bad';
+  } else {
+    b.textContent = 'switch to LIVE';
+    badge.textContent = 'PAPER - simulated';
+    badge.className = 'badge ok';
+  }
+}
+function toggleMode(){
+  var target = currentMode === 'live' ? 'paper' : 'live';
+  if (target === 'live' && !confirm('SWITCH TO LIVE TRADING? Real orders will be placed on your DHAN account balance. The switch applies once all open positions are flat. Continue?')) return;
+  fetch('/api/control', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({mode: target})
+  }).then(function(r){ return r.json(); }).then(function(j){
+    if (j.ok && j.mode){ currentMode = j.mode; setModeBtn(); }
+  }).catch(function(){});
+}
+document.getElementById('toggleMode').addEventListener('click', toggleMode);
+
+function tick(){
+  fetch('/api/state').then(function(r){ return r.json(); }).then(function(s){
+    if (s.mode){ currentMode = s.mode; setModeBtn(); }
+    if (!s.running){
+      document.getElementById('sub').textContent = s.message || 'not running';
+      document.getElementById('cards').innerHTML = '<div class="card"><div class="value warn">loop not running</div></div>';
+      return;
+    }
+    render(s);
+  }).catch(function(){});
+}
+tick(); loadTrades();
+setInterval(tick, 5000); setInterval(loadTrades, 15000);
+</script>
+</body>
+</html>

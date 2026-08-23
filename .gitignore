@@ -1,0 +1,35 @@
+# ---- secrets / credentials ----
+.env
+.env.*
+!.env.example
+dhan_token.txt
+*.pem
+*.key
+
+# ---- runtime data (never commit) ----
+data/*
+!data/event_blackout.json
+!data/stock_universe.csv
+!data/.gitkeep
+logs/
+*.log
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# ---- reference clones (not part of this project) ----
+analysis/
+
+# ---- model / db artifacts ----
+*.pkl
+*.db
+*.sqlite*
+
+# ---- IDE / OS ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
