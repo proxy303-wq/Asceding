@@ -107,6 +107,10 @@ def main():
     ap.add_argument("--points", type=float, default=None, help="scalp: exit at entry + points (e.g. 10)")
     ap.add_argument("--sl-points", type=float, default=None, help="scalp: stop at entry - points (e.g. 10)")
     ap.add_argument("--lots", type=int, default=None, help="scalp: fixed lots (e.g. 7)")
+    ap.add_argument("--t1", type=float, default=None, help="scalp: T1 target points (e.g. 10)")
+    ap.add_argument("--t2", type=float, default=None, help="scalp: T2 target points (e.g. 15)")
+    ap.add_argument("--partial", type=float, default=None, help="scalp: % booked at T1 (e.g. 50)")
+    ap.add_argument("--target-gain-pct", type=float, default=None, help="target = premium x (1 + pct/100)")
     ap.add_argument("--no-btst-stocks", action="store_true")
     ap.add_argument("--db", default="data/backtest_csv.db")
     args = ap.parse_args()
@@ -114,7 +118,7 @@ def main():
     cfg = load_config()
     cfg["mode"] = "paper"
     if args.sl_pct is not None:
-        cfg["risk"]["sl_pct"] = args.sl_pct
+        cfg["risk"]["default_sl_pct"] = args.sl_pct   # key the risk engine actually reads
     if args.rr is not None:
         cfg["risk"]["reward_risk"] = args.rr
     if args.exit:
@@ -130,10 +134,15 @@ def main():
     if args.break_atr is not None: lv["break_atr"] = args.break_atr
     if args.look is not None: lv["look_atr"] = args.look
     if args.min_confirm is not None: lv["min_confirm"] = args.min_confirm
-    if args.points is not None or args.sl_points is not None or args.lots is not None:
+    if args.target_gain_pct is not None:
+        cfg["risk"]["target_gain_pct"] = args.target_gain_pct
+    if any(v is not None for v in (args.points, args.sl_points, args.lots, args.t1, args.t2, args.partial)):
         cfg["risk"]["scalp"] = {
             "target_points": args.points or 0,
+            "t1_points": args.t1 or 0,
+            "t2_points": args.t2 or 0,
             "sl_points": args.sl_points or 0,
+            "partial_pct": args.partial or 50,
             "lots": args.lots or 0,
         }
     cfg["stock_btst"]["enabled"] = not args.no_btst_stocks

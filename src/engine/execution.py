@@ -216,6 +216,37 @@ class ExecutionManager:
             except Exception as e:
                 log.warning("live reconcile failed: %s", e)
 
+    def _manage_scalp(self, sid: str, tr: "ActiveTrade", ltp: float):
+        """T1/T2 point targets with lock-profit (PrOxy-style). Only for FNO BUY legs."""
+        r = self.risk
+        entry = tr.entry_price
+        t1 = entry + r.scalp_t1
+        t2 = entry + r.scalp_t2
+        if not tr.meta.get("partial_done"):
+            if ltp >= t1:
+                partial = max(1, int(tr.qty * r.scalp_partial / 100.0))
+                if partial >= tr.qty:
+                    self.exit_security(sid, "TARGET_T1")
+                    return
+                if self.mode == "paper" and hasattr(self.broker, "partial_exit"):
+                    if self.broker.partial_exit(sid, partial, t1):
+                        tr.qty -= partial
+                        tr.meta["partial_done"] = True
+                        tr.meta["t1_pnl"] = (t1 - entry) * partial
+                        tr.meta["t1_price"] = t1
+                        self._apply_sl(tr, entry)      # lock at breakeven
+                        tr.target_price = t2
+                        log.info("SCALP T1 %s: booked %d @ %.2f, locked, riding to T2 %.2f",
+                                 tr.symbol, partial, t1, t2)
+            return
+        # after T1: lock-profit trail toward T2
+        peak = tr.meta.get("peak", entry)
+        if r.scalp_lock and t1 > entry:
+            new_sl = max(tr.sl_price, entry, peak - r.scalp_t1 * 0.3)
+            self._apply_sl(tr, new_sl)
+        if ltp >= t2:
+            self.exit_security(sid, "TARGET_T2")
+
     def _manage_exits(self, indicators: Optional[dict] = None):
         """Trailing stop, breakeven, reversal-confirmation exit, time stop."""
         if not self.open:
@@ -233,6 +264,9 @@ class ExecutionManager:
             sign = 1 if tr.side == "BUY" else -1
             r_val = tr.meta.get("r", 0.0)
             profit = (ltp - tr.entry_price) * sign
+            if r_cfg.scalp_t1 > 0 and tr.side == "BUY" and tr.segment == "FNO" and not tr.btst:
+                self._manage_scalp(sid, tr, ltp)
+                continue
             tr.meta["peak"] = max(tr.meta.get("peak", tr.entry_price), ltp) if sign > 0 else                               min(tr.meta.get("peak", tr.entry_price), ltp)
             peak = tr.meta["peak"]
 

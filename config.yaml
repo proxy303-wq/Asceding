@@ -21,10 +21,13 @@ risk:
   reward_risk: 1.8           # take-profit = entry_risk * reward_risk
   time_exit: "15:05"         # final backstop: flatten all intraday positions by this time
   flat_unprofitable_hm: "14:00"  # exit positions that are underwater at/after this time (0 = off)
-  scalp:                       # point-based scalp: exit at fixed premium-point target/stop
-    target_points: 0           # e.g. 10 = sell at entry + 10 (PE@145 -> exit 155/156)
-    sl_points: 0               # e.g. 10 = stop at entry - 10 (0 = fall back to sl_pct)
-    lots: 0                    # 0 = size by risk; else fixed lots (e.g. 7 x lot size)
+  scalp:                       # point-based targets with lock-profit (PrOxy-style)
+    t1_points: 10              # T1: book partial_pct% at entry + 10 (e.g. PE@145 -> 155)
+    t2_points: 15              # T2: exit the rest at entry + 15 (160)
+    sl_points: 5               # stop at entry - 5 (140) - SL first, target second
+    partial_pct: 50            # % booked at T1
+    lock: true                 # after T1: lock SL at entry and trail toward T2
+    lots: 0                    # 0 = size by risk; else fixed lots (e.g. 2)
   no_new_entries_after: "14:30"   # options trading window: entries only 09:30-14:30 IST
   max_dte: 7                 # only trade expiries up to this many days away
   min_dte: 0.1               # skip entries when less than this many days to expiry (~last 2.5h of expiry day)

@@ -57,6 +57,12 @@ class RiskManager:
         self.trail_arm_r = float(trail.get("arm_after_r", 1.0))
         self.trail_step_r = float(trail.get("trail_step_r", 0.5))
         self.breakeven_r = float(trail.get("breakeven_after_r", 0.8))
+        scalp = risk_cfg.get("scalp", {}) or {}
+        self.scalp_t1 = float(scalp.get("t1_points", 0) or 0)
+        self.scalp_t2 = float(scalp.get("t2_points", 0) or 0)
+        self.scalp_sl = float(scalp.get("sl_points", 0) or 0)
+        self.scalp_partial = float(scalp.get("partial_pct", 50) or 50)
+        self.scalp_lock = bool(scalp.get("lock", True))
         lock = risk_cfg.get("lock_profit", {})
         self.lock_enabled = bool(lock.get("enabled", False))
         self.lock_arm_pct = float(lock.get("arm_pct", 0.8))
@@ -80,6 +86,11 @@ class RiskManager:
         if d != self._day:
             self._day = d
             self._day_start_equity = None
+            if self.halted and "daily" not in self.halt_reason:
+                pass
+            # a new trading day clears yesterday's halt (loss/profit/streak limits)
+            self.halted = False
+            self.halt_reason = ""
         return d
 
     def set_day_start_equity(self, equity: float):

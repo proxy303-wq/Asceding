@@ -92,7 +92,7 @@ class PaperBroker(Broker):
                 self.cash += value
                 pos.exits.append({"qty": qty, "price": fill, "ts": time.time(), "pnl": pnl})
                 if pos.qty == 0:
-                    self._close_trade(pos, tag or "SELL_EXIT", fill)
+                    self._close_trade(pos, tag or "SELL_EXIT", fill, qty=qty, pnl=pnl)
             oid = "PAPER-" + uuid.uuid4().hex[:12]
             self.orders.append({"order_id": oid, "security_id": security_id, "side": transaction_type,
                                 "qty": qty, "price": fill, "ts": time.time()})
@@ -137,9 +137,22 @@ class PaperBroker(Broker):
         return Funds(available_balance=self.cash + unreal, utilized_amount=0.0,
                      withdrawable_balance=self.cash)
 
+    def partial_exit(self, security_id: str, qty: int, price: float) -> bool:
+        """Book part of a position at a price WITHOUT closing the trade record
+        (used for T1 partials). Returns True on success."""
+        pos = self.positions.get(security_id)
+        if pos is None or pos.qty < qty or qty <= 0:
+            return False
+        pnl = (price - pos.entry_price) * qty
+        pos.qty -= qty
+        pos.realized_pnl += pnl
+        self.cash += price * qty
+        pos.exits.append({"qty": qty, "price": price, "ts": time.time(), "pnl": pnl, "partial": True})
+        return True
+
     def mark_paper_exits(self):
-        """Close paper positions that hit SL/target (called by engine on each quote tick).
-        place_order(SELL) already closes the position and records the trade."""
+        """Close paper positions that hit SL/target. Fills happen AT the stop/target
+        level (a stop order fills at the trigger price, not the next bar's close)."""
         for sid, pos in list(self.positions.items()):
             if pos.qty == 0:
                 continue
@@ -147,18 +160,26 @@ class PaperBroker(Broker):
             if q is None or q.ltp <= 0:
                 continue
             if pos.sl_price > 0 and q.ltp <= pos.sl_price:
-                res = self.place_order(sid, "SELL", pos.qty, order_type="MARKET", tag="SL_HIT")
-                if res.ok:
-                    log.info("paper SL hit %s at %.2f", sid, pos.sl_price)
+                self._force_sell_at(sid, pos, pos.sl_price, "SL_HIT")
             elif pos.target_price > 0 and q.ltp >= pos.target_price:
-                res = self.place_order(sid, "SELL", pos.qty, order_type="MARKET", tag="TARGET_HIT")
-                if res.ok:
-                    log.info("paper target hit %s at %.2f", sid, pos.target_price)
+                self._force_sell_at(sid, pos, pos.target_price, "TARGET_HIT")
 
-    def _close_trade(self, pos: PaperPosition, reason: str, exit_price: float):
+    def _force_sell_at(self, sid: str, pos, price: float, reason: str):
+        qty = pos.qty
+        pnl = (price - pos.entry_price) * qty
+        self.cash += price * qty
+        pos.qty = 0
+        pos.realized_pnl += pnl
+        self._close_trade(pos, reason, price, qty=qty, pnl=pnl)
+        log.info("paper %s %s at %.2f (pnl %.2f)", reason, sid, price, pnl)
+
+    def _close_trade(self, pos: PaperPosition, reason: str, exit_price: float,
+                     qty: int | None = None, pnl: float | None = None):
         self.trades.append({
             "security_id": pos.security_id, "symbol": pos.symbol,
-            "qty": pos.qty, "entry_price": pos.entry_price, "exit_price": exit_price,
-            "pnl": pos.realized_pnl, "reason": reason, "ts": time.time(),
+            "qty": pos.qty if qty is None else qty,
+            "entry_price": pos.entry_price, "exit_price": exit_price,
+            "pnl": pos.realized_pnl if pnl is None else pnl,
+            "reason": reason, "ts": time.time(),
         })
         del self.positions[pos.security_id]
