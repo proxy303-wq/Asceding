@@ -62,7 +62,7 @@ class MeanReversionStrategy(Strategy):
                 underlying=ctx.underlying, expiry=expiry, strike=strike,
                 reason="meanrev: RSI %.0f > upper BB (overbought) - buy PUT" % r,
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"atm": atm, "interval": interval},
+                meta={"atm": atm, "interval": interval, "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
         elif r <= rsi_os and ctx.spot < lower:
             strike = atm + offset * interval
@@ -72,6 +72,6 @@ class MeanReversionStrategy(Strategy):
                 underlying=ctx.underlying, expiry=expiry, strike=strike,
                 reason="meanrev: RSI %.0f < lower BB (oversold) - buy CE" % r,
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"atm": atm, "interval": interval},
+                meta={"atm": atm, "interval": interval, "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
         return signals

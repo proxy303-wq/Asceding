@@ -303,6 +303,27 @@ class ExecutionManager:
             log.info("time exit triggered at %04d", hm)
             self.exit_non_btst("TIME_EXIT")
 
+    def flat_unprofitable(self, flat_hm: int = 1400):
+        """Exit open intraday positions that are at or below breakeven after
+        flat_hm (stop riding losers until the 15:05 backstop)."""
+        if flat_hm <= 0 or not self.open:
+            return
+        from ..config import ist_now
+        now = ist_now()
+        if now.hour * 100 + now.minute < flat_hm:
+            return
+        for sid, tr in list(self.open.items()):
+            if tr.segment != "FNO" or tr.btst:
+                continue
+            q = self.quote_provider(sid) if self.quote_provider else None
+            ltp = q.ltp if q else 0.0
+            if ltp <= 0:
+                continue
+            profit = (ltp - tr.entry_price) * (1 if tr.side == "BUY" else -1)
+            if profit <= 0:
+                log.info("flat unprofitable %s at %04d (pnl %.0f)", tr.symbol, flat_hm, profit)
+                self.exit_security(sid, "FLAT_UNPROFITABLE")
+
     def exit_non_btst(self, reason: str):
         for sid, tr in list(self.open.items()):
             if not tr.btst and tr.segment != "EQ":

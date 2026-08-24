@@ -104,6 +104,9 @@ def main():
     ap.add_argument("--break", dest="break_atr", type=float, default=None, help="levels: break_atr")
     ap.add_argument("--look", type=float, default=None, help="levels: look_atr")
     ap.add_argument("--min-confirm", type=float, default=None, help="levels: min_confirm score")
+    ap.add_argument("--points", type=float, default=None, help="scalp: exit at entry + points (e.g. 10)")
+    ap.add_argument("--sl-points", type=float, default=None, help="scalp: stop at entry - points (e.g. 10)")
+    ap.add_argument("--lots", type=int, default=None, help="scalp: fixed lots (e.g. 7)")
     ap.add_argument("--no-btst-stocks", action="store_true")
     ap.add_argument("--db", default="data/backtest_csv.db")
     args = ap.parse_args()
@@ -127,6 +130,12 @@ def main():
     if args.break_atr is not None: lv["break_atr"] = args.break_atr
     if args.look is not None: lv["look_atr"] = args.look
     if args.min_confirm is not None: lv["min_confirm"] = args.min_confirm
+    if args.points is not None or args.sl_points is not None or args.lots is not None:
+        cfg["risk"]["scalp"] = {
+            "target_points": args.points or 0,
+            "sl_points": args.sl_points or 0,
+            "lots": args.lots or 0,
+        }
     cfg["stock_btst"]["enabled"] = not args.no_btst_stocks
     for s in cfg.get("strategies", {}).values():
         s["enabled"] = s.get("enabled", True)

@@ -19,7 +19,12 @@ risk:
   max_drawdown_pct: 4.0      # halt for the day if equity drops this % from day start
   default_sl_pct: 0.30       # default stop-loss as % of option premium (long options)
   reward_risk: 1.8           # take-profit = entry_risk * reward_risk
-  time_exit: "15:05"         # flatten all intraday positions by this time
+  time_exit: "15:05"         # final backstop: flatten all intraday positions by this time
+  flat_unprofitable_hm: "14:00"  # exit positions that are underwater at/after this time (0 = off)
+  scalp:                       # point-based scalp: exit at fixed premium-point target/stop
+    target_points: 0           # e.g. 10 = sell at entry + 10 (PE@145 -> exit 155/156)
+    sl_points: 0               # e.g. 10 = stop at entry - 10 (0 = fall back to sl_pct)
+    lots: 0                    # 0 = size by risk; else fixed lots (e.g. 7 x lot size)
   no_new_entries_after: "14:30"   # options trading window: entries only 09:30-14:30 IST
   max_dte: 7                 # only trade expiries up to this many days away
   min_dte: 0.1               # skip entries when less than this many days to expiry (~last 2.5h of expiry day)

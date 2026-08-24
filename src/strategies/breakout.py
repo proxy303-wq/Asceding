@@ -58,7 +58,7 @@ class BreakoutStrategy(Strategy):
                 underlying=ctx.underlying, expiry=expiry, strike=strike,
                 reason="OR breakout up (%.0f > %.0f) vol surge, OI+%s" % (ctx.spot, or_high, "y" if oi_up else "n"),
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"atm": atm, "or_high": or_high, "or_low": or_low},
+                meta={"atm": atm, "or_high": or_high, "or_low": or_low, "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
         elif dn_break and vol_ok and iv_ok and (not oi_confirm or oi_dn):
             strike = atm - offset * interval
@@ -68,6 +68,6 @@ class BreakoutStrategy(Strategy):
                 underlying=ctx.underlying, expiry=expiry, strike=strike,
                 reason="OR breakout down (%.0f < %.0f) vol surge, OI+%s" % (ctx.spot, or_low, "y" if oi_dn else "n"),
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"atm": atm, "or_high": or_high, "or_low": or_low},
+                meta={"atm": atm, "or_high": or_high, "or_low": or_low, "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
         return signals

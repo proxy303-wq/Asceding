@@ -86,7 +86,7 @@ class LevelPrimaryStrategy(Strategy):
                 strike=atm + (offset if direction == "CE" else -offset) * interval,
                 reason="LEVEL %s | %s" % (reason, "+".join(sorted({l.kind for l in levels[:3]}))),
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"atm": atm, "interval": interval, "levels": [l.price for l in levels[:4]]},
+                meta={"atm": atm, "interval": interval, "levels": [l.price for l in levels[:4]], "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
 
         min_confirm = float(cfg.get("min_confirm", 45))

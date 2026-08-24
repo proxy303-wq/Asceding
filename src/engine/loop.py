@@ -479,6 +479,13 @@ class AutoTrader:
                 log.info("stock BTST time exit %s at %04d", tr.symbol, exit_hm)
                 self.exec_mgr.exit_security(sid, "STOCK_TIME_EXIT")
 
+    def _hm(self, s: str) -> int:
+        try:
+            h, m = s.split(":")
+            return int(h) * 100 + int(m)
+        except Exception:
+            return 1400
+
     # ------------------------------------------------------------------
     # Paper <-> Live mode switching (live uses the real DHAN account balance)
     # ------------------------------------------------------------------
@@ -850,6 +857,7 @@ class AutoTrader:
 
         self.exec_mgr.monitor(indicators={st.underlying: st.indicators for st in states})
         self.exec_mgr.check_time_exit()
+        self.exec_mgr.flat_unprofitable(_hm(int(self.cfg.get("risk", {}).get("flat_unprofitable_hm", "14:00"))))
         chains_state = {}
         for st in states:
             if st.chain is not None:

@@ -68,7 +68,7 @@ class TrendMomentumStrategy(Strategy):
                 underlying=ctx.underlying, expiry=expiry, strike=strike,
                 reason="bullish trend + pullback, IV pct=%.0f, RSI=%.1f" % (ctx.iv_percentile, r),
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"atm": atm, "interval": interval},
+                meta={"atm": atm, "interval": interval, "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
         elif trend_dn and pullback_dn and atr_ok and iv_ok and rsi_dn_ok:
             strike = atm - offset * interval
@@ -78,6 +78,6 @@ class TrendMomentumStrategy(Strategy):
                 underlying=ctx.underlying, expiry=expiry, strike=strike,
                 reason="bearish trend + pullback, IV pct=%.0f, RSI=%.1f" % (ctx.iv_percentile, r),
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"atm": atm, "interval": interval},
+                meta={"atm": atm, "interval": interval, "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
         return signals

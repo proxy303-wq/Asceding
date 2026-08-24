@@ -77,7 +77,7 @@ class CandlestickStrategy(Strategy):
                 reason="candle %s after downtrend (RSI %.0f, IV pct %.0f)" % (
                     "+".join(sorted(names)), r or 0, ctx.iv_percentile),
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"patterns": sorted(names), "atm": atm, "interval": interval},
+                meta={"patterns": sorted(names), "atm": atm, "interval": interval, "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
         elif bear and up_count >= min_against and r is not None and r >= float(cfg.get("rsi_min_bear", 55)) and iv_ok:
             strike = atm - offset * interval
@@ -88,6 +88,6 @@ class CandlestickStrategy(Strategy):
                 reason="candle %s after uptrend (RSI %.0f, IV pct %.0f)" % (
                     "+".join(sorted(names)), r or 0, ctx.iv_percentile),
                 ts=time.time(), entry_price_hint=row.ltp if row else 0.0,
-                meta={"patterns": sorted(names), "atm": atm, "interval": interval},
+                meta={"patterns": sorted(names), "atm": atm, "interval": interval, "max_hold_min": int(cfg.get("max_hold_min", 150))},
             ))
         return signals

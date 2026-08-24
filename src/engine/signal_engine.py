@@ -314,7 +314,22 @@ class SignalEngine:
 
         lot_size = int(ucfg.get("lot_size", 0) or 0)
         sl_pct = float(sig.meta.get("sl_pct", self.risk.sl_pct))
-        if sig.side == "BUY":
+        scalp = self.config.get("risk", {}).get("scalp", {}) or {}
+        target_pts = float(scalp.get("target_points", 0) or 0)
+        sl_pts = float(scalp.get("sl_points", 0) or 0)
+        if sig.side == "BUY" and target_pts > 0:
+            # point-based scalp: exit at entry + target_points / entry - sl_points
+            sl_price = (premium - sl_pts) if sl_pts > 0 else premium * (1 - sl_pct)
+            target_price = premium + target_pts
+            fixed_lots = int(scalp.get("lots", 0) or 0)
+            if fixed_lots > 0:
+                qty = fixed_lots * lot_size if lot_size else fixed_lots
+            elif sl_pts > 0:
+                qty = max(lot_size or 1, (int(self.risk.risk_per_trade / sl_pts) // (lot_size or 1)) * (lot_size or 1))
+            else:
+                qty = self.risk.size_position(premium, st.underlying, lot_size, sl_pct)
+            product = "INTRADAY"
+        elif sig.side == "BUY":
             qty = self.risk.size_position(premium, st.underlying, lot_size, sl_pct)
             sl_price, target_price = self.risk.sl_target_prices(premium, sl_pct)
             # optional delta-based SL: premium SL implied by the spot stop, via delta
